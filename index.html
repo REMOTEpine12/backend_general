@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Simulador de Cafetería</title>
+</head>
+<body>
+    <h1> Simulador de Pedidos</h1>
+    
+    <button id="btn-agregar" onclick="orquestarFlujoPedido()">Agregar Nuevo Pedido</button>
+    
+    <hr>
+    
+    <h2>Cola de Pedidos:</h2>
+    <ul id="lista-pedidos"></ul>
+
+    <script>
+        let contadorPedidos = 1;
+
+        /**
+         * Función Orquestadora:
+         * Demuestra cómo async/await permite leer el código de forma síncrona
+         * mientras por debajo JS delega las esperas al Event Loop, sin bloquear la UI.
+         */
+        async function orquestarFlujoPedido() {
+            const nombre = "Café Americano #" + contadorPedidos++;
+            
+            // 1. Inicia el pedido (BD y UI)
+            const { pedido, elementoUI } = await crearPedido(nombre);
+            
+            // 2. Simula el tiempo de preparación (bloquea esta función, pero NO el navegador)
+            await simularPreparacion();
+            
+            // 3. Concluye el pedido (BD y UI)
+            await completarPedido(pedido.id, elementoUI);
+        }
+
+        /**
+         * 1. crearPedido()
+         * Persiste en BD con estado 'En Proceso' e inserta el nodo en el DOM nativo.
+         */
+        async function crearPedido(nombre_pedido) {
+            // Llamada asíncrona al Backend
+            const respuesta = await fetch('/api/pedidos', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nombre_pedido })
+            });
+            const pedido = await respuesta.json();
+
+            // Manipulación de DOM nativa
+            const lista = document.getElementById('lista-pedidos');
+            const item = document.createElement('li');
+            item.id = `pedido-${pedido.id}`;
+            item.innerHTML = `<strong>${pedido.nombre_pedido}</strong> - Estado: <span>${pedido.estado} ⏳</span>`;
+            
+            lista.appendChild(item);
+
+            // Retornamos tanto los datos como la referencia al nodo del DOM 
+            // para actualizarlo posteriormente sin tener que buscarlo de nuevo.
+            return { pedido, elementoUI: item };
+        }
+
+        /**
+         * 2. simularPreparacion()
+         * Envuelve un setTimeout en una Promesa para que pueda ser consumida con await.
+         * Demuestra la fase de temporizadores (Timers) del Event Loop.
+         */
+        function simularPreparacion() {
+            // Tiempo aleatorio entre 2000ms (2s) y 5000ms (5s)
+            const tiempoPreparacion = Math.floor(Math.random() * (5000 - 2000 + 1)) + 2000;
+            
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    resolve();
+                }, tiempoPreparacion);
+            });
+        }
+
+        /**
+         * 3. completarPedido()
+         * Actualiza el registro en la BD a 'Completado' y refresca la vista del usuario.
+         */
+        async function completarPedido(id, elementoUI) {
+            // Actualización asíncrona en Backend
+            await fetch(`/api/pedidos/${id}`, {
+                method: 'PUT'
+            });
+
+            // Actualización del nodo en el DOM
+            const spanEstado = elementoUI.querySelector('span');
+            spanEstado.textContent = "Completado";
+        }
+    </script>
+</body>
+</html>
